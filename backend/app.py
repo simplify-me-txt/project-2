@@ -28,14 +28,14 @@ app.config['JSON_SORT_KEYS'] = False
 @app.route('/')
 def serve_frontend():
     """Serve the main HTML file"""
-    directory = app.static_folder or os.path.join(os.path.dirname(__file__), '..', 'frontend')
-    return send_from_directory(directory, 'index.html')
+    frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
+    return send_from_directory(frontend_dir, 'index.html')
 
 @app.route('/<path:path>')
 def serve_static_files(path):
     """Serve CSS, JS, and other static files"""
-    directory = app.static_folder or os.path.join(os.path.dirname(__file__), '..', 'frontend')
-    return send_from_directory(directory, path)
+    frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
+    return send_from_directory(frontend_dir, path)
     return send_from_directory(app.static_folder, path)
 
 
@@ -183,6 +183,54 @@ def get_ingredient_database():
         return jsonify({
             'status': 'error',
             'message': str(e)
+        }), 500
+
+
+@app.route('/api/visualize', methods=['POST'])
+def visualize_recipe():
+    """
+    Generate visualization charts for recipe analysis
+    Expects the same data as /api/analyze endpoint
+    """
+    try:
+        from visualization import (create_calorie_chart, 
+                                   create_analysis_summary_chart,
+                                   create_nutrition_pie_chart)
+        
+        # Get analysis data from request
+        data = request.get_json()
+        
+        if not data or 'analysis' not in data:
+            return jsonify({
+                'status': 'error',
+                'message': 'Analysis data required'
+            }), 400
+        
+        analysis = data['analysis']
+        
+        # Generate charts
+        calorie_chart = create_calorie_chart(
+            analysis['calories']['breakdown'],
+            analysis['calories']['total']
+        )
+        
+        summary_chart = create_analysis_summary_chart(analysis)
+        
+        nutrition_pie = create_nutrition_pie_chart(analysis)
+        
+        return jsonify({
+            'status': 'success',
+            'charts': {
+                'calorie_breakdown': calorie_chart,
+                'summary_dashboard': summary_chart,
+                'nutrition_pie': nutrition_pie
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': f'Visualization error: {str(e)}'
         }), 500
 
 
