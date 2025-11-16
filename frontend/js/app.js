@@ -78,6 +78,11 @@ async function handleFormSubmit(e) {
             })
         });
         
+        // Check if response is ok
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}`);
+        }
+        
         const data = await response.json();
         
         if (data.status === 'success') {
@@ -86,6 +91,9 @@ async function handleFormSubmit(e) {
             
             // Display results
             displayResults(data);
+            
+            // Generate and display charts (without blocking)
+            generateCharts(data).catch(err => console.log('Charts optional:', err));
             
             // Save to history
             saveToHistory(data);
@@ -97,7 +105,7 @@ async function handleFormSubmit(e) {
         }
     } catch (error) {
         console.error('Error:', error);
-        showError('Failed to connect to server. Make sure the backend is running.');
+        showError('Failed to analyze recipe. Please check if the backend is running on port 5005.');
     } finally {
         setLoadingState(false);
     }
@@ -228,6 +236,58 @@ function displayResults(data) {
     
     resultContent.innerHTML = html;
     resultCard.style.display = 'block';
+}
+
+/**
+ * Generate and display charts
+ */
+async function generateCharts(data) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/visualize`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+            console.error('Visualization failed');
+            return;
+        }
+        
+        const chartData = await response.json();
+        
+        if (chartData.status === 'success' && chartData.charts) {
+            // Add charts to the results
+            let chartsHtml = `
+                <div class="result-section">
+                    <h3>📊 Visual Analytics</h3>
+                    
+                    <div class="chart-container">
+                        <h4>Calorie Breakdown</h4>
+                        <img src="${chartData.charts.calorie_breakdown}" alt="Calorie Chart">
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h4>Analysis Summary</h4>
+                        <img src="${chartData.charts.summary_dashboard}" alt="Summary Chart">
+                    </div>
+                    
+                    <div class="chart-container">
+                        <h4>Nutrition Distribution</h4>
+                        <img src="${chartData.charts.nutrition_pie}" alt="Nutrition Pie Chart">
+                    </div>
+                </div>
+            `;
+            
+            // Append charts to results
+            resultContent.innerHTML += chartsHtml;
+        }
+    } catch (error) {
+        console.error('Chart generation error:', error);
+        // Don't show error to user, charts are optional
+    }
 }
 
 /**
